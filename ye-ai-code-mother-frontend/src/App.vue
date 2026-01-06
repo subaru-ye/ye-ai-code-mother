@@ -1,30 +1,9 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import BasicLayout from '@/layouts/BasicLayout.vue'
 </script>
 
 <template>
-  <header>
-  </header>
-
-  <RouterView />
+  <BasicLayout />
 </template>
 
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-
-nav a:first-of-type {
-  border: 0;
-}
-
-</style>
+<style></style>
