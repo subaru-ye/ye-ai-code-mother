@@ -1,0 +1,12 @@
+/* Reset and base styles */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: sans-serif; min-height: 100vh; display: flex; justify-content: center; align-items: center; background: #f0f2f5; }
+/* Login container */
+.login-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
+h1 { margin-bottom: 1.5rem; color: #333; }
+/* Form styles */
+#loginForm { display: flex; flex-direction: column; gap: 1rem; }
+input, button { padding: 0.8rem; border-radius: 4px; border: 1px solid #ddd; font-size: 1rem; }
+button { background: #007bff; color: white; border: none; cursor: pointer; }
+button:hover { background: #0056b3; }
+.hint { margin-top: 1rem; font-size: 0.9rem; color: #666; }

@@ -1,6 +1,8 @@
 spring:
   application:
     name: ye-ai-code-mother-backend
+  profiles:
+    active: local
 
   # mysql
   datasource:
