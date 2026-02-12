@@ -2,6 +2,7 @@ package com.ye.yeaicodemother.controller;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.ye.yeaicodemother.annotation.AuthCheck;
@@ -13,30 +14,25 @@ import com.ye.yeaicodemother.constant.UserConstant;
 import com.ye.yeaicodemother.exception.BusinessException;
 import com.ye.yeaicodemother.exception.ErrorCode;
 import com.ye.yeaicodemother.exception.ThrowUtils;
-import com.ye.yeaicodemother.model.dto.app.AppAddRequest;
-import com.ye.yeaicodemother.model.dto.app.AppAdminUpdateRequest;
-import com.ye.yeaicodemother.model.dto.app.AppQueryRequest;
-import com.ye.yeaicodemother.model.dto.app.AppUpdateRequest;
+import com.ye.yeaicodemother.model.dto.app.*;
 import com.ye.yeaicodemother.model.entity.User;
 import com.ye.yeaicodemother.model.enums.CodeGenTypeEnum;
 import com.ye.yeaicodemother.model.vo.AppVO;
 import com.ye.yeaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.ye.yeaicodemother.model.entity.App;
 import com.ye.yeaicodemother.service.AppService;
-import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 应用 控制层。
@@ -52,6 +48,75 @@ public class AppController {
 
     @Resource
     private UserService userService;
+
+
+    /**
+     * 通过聊天方式生成代码的 API 端点
+     * 该接口采用 Server-Sent Events (SSE) 技术，允许服务器向客户端持续推送数据，
+     * 适用于AI模型逐步生成代码并实时返回给前端的场景。
+     *
+     * @param appId   请求的应用ID，用于确定使用哪个应用的上下文和配置来生成代码。
+     * @param message 用户发送的提示词（Prompt），描述希望AI生成什么样的代码。
+     * @param request HTTP请求对象，用于获取当前登录的用户信息。
+     * @return Flux<ServerSentEvent<String>> 一个响应式流，持续发送包含代码片段的SSE事件，
+     *                                       最后发送一个名为 "done" 的结束事件。
+     */
+    @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
+                                                       @RequestParam String message,
+                                                       HttpServletRequest request) {
+        // 1. 参数校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 错误");
+        ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "提示词不能为空");
+
+        // 2. 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+
+        // 3. 调用核心服务生成代码（SSE 流式返回）
+        Flux<String> contentFlux = appService.chatToGenCode(appId, message, loginUser);
+
+        // 4. 处理并包装数据流
+        return contentFlux
+                // 对流中的每一个代码片段（chunk）进行处理
+                .map(chunk -> {
+                    // 将代码片段放入一个Map中，键为 "d" (data的缩写)
+                    Map<String, String> wrapper = Map.of("d", chunk);
+                    // 将Map序列化为JSON字符串
+                    String jsonData = JSONUtil.toJsonStr(wrapper);
+                    // 构建一个 ServerSentEvent，将JSON字符串作为数据载荷
+                    return ServerSentEvent.<String>builder()
+                            .data(jsonData) // 设置事件数据
+                            .build();
+                })
+                // 在主数据流结束后，追加一个特殊的结束事件
+                .concatWith(Mono.just(
+                        ServerSentEvent.<String>builder()
+                                .event("done") // 设置事件名为 "done"
+                                .data("")
+                                .build()
+                ));
+    }
+
+    /**
+     * 应用部署
+     *
+     * @param appDeployRequest 部署请求
+     * @param request          请求
+     * @return 部署 URL
+     */
+    @PostMapping("/deploy")
+    public BaseResponse<String> deployApp(@RequestBody AppDeployRequest appDeployRequest, HttpServletRequest request) {
+        // 参数校验
+        ThrowUtils.throwIf(appDeployRequest == null, ErrorCode.PARAMS_ERROR);
+        Long appId = appDeployRequest.getAppId();
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        // 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        // 调用服务部署应用
+        String deployUrl = appService.deployApp(appId, loginUser);
+        return ResultUtils.success(deployUrl);
+    }
+
 
     /**
      * 创建应用

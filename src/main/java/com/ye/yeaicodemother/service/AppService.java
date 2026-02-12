@@ -4,7 +4,9 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
 import com.ye.yeaicodemother.model.dto.app.AppQueryRequest;
 import com.ye.yeaicodemother.model.entity.App;
+import com.ye.yeaicodemother.model.entity.User;
 import com.ye.yeaicodemother.model.vo.AppVO;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -15,6 +17,23 @@ import java.util.List;
  */
 public interface AppService extends IService<App> {
 
+    /**
+     * 通过对话生成应用代码
+     *
+     * @param appId 应用 ID
+     * @param message 提示词
+     * @param loginUser 登录用户
+     */
+    Flux<String> chatToGenCode(Long appId, String message, User loginUser);
+
+    /**
+     * 应用部署
+     *
+     * @param appId 应用 ID
+     * @param loginUser 登录用户
+     * @return 可访问的部署地址
+     */
+    String deployApp(Long appId, User loginUser);
 
     /**
      * 将数据库应用实体 (App) 转换为应用视图对象 (AppVO)。
