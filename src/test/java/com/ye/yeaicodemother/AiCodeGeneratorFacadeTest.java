@@ -24,7 +24,7 @@ class AiCodeGeneratorFacadeTest {
 //    }
     @Test
     void generateAndSaveCodeStream() {
-        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("登录界面，不超过20行代码", CodeGenTypeEnum.MULTI_FILE);
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("注册界面，不超过20行代码", CodeGenTypeEnum.MULTI_FILE);
         // 阻塞等待所有数据收集完成
         List<String> result = codeStream.collectList().block();
         // 验证结果

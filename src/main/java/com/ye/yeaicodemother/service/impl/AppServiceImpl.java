@@ -1,0 +1,159 @@
+package com.ye.yeaicodemother.service.impl;
+
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.spring.service.impl.ServiceImpl;
+import com.ye.yeaicodemother.exception.BusinessException;
+import com.ye.yeaicodemother.exception.ErrorCode;
+import com.ye.yeaicodemother.model.dto.app.AppQueryRequest;
+import com.ye.yeaicodemother.model.entity.App;
+import com.ye.yeaicodemother.mapper.AppMapper;
+import com.ye.yeaicodemother.model.entity.User;
+import com.ye.yeaicodemother.model.vo.AppVO;
+import com.ye.yeaicodemother.model.vo.UserVO;
+import com.ye.yeaicodemother.service.AppService;
+import com.ye.yeaicodemother.service.UserService;
+import jakarta.annotation.Resource;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * 应用 服务层实现。
+ *
+ * @author <a href="https://github.com/subaru-ye">程序员Ye</a>
+ */
+@Service
+public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppService{
+
+    @Resource
+    private UserService userService;
+
+    /**
+     * 将数据库应用实体 (App) 转换为应用视图对象 (AppVO)。
+     * 主要用于将应用信息脱敏后返回给前端，并关联查询创建者信息。
+     *
+     * @param app 数据库中的应用实体对象。
+     * @return AppVO 脱敏后的应用视图对象；如果输入的 app 为 null，则返回 null。
+     */
+    @Override
+    public AppVO getAppVO(App app) {
+        // 1. 校验输入参数
+        if (app == null) {
+            return null;
+        }
+
+        // 2. 创建 VO 对象并复制基础属性
+        // 将 App 实体的所有公共 getter/setter 属性值复制到 AppVO 中
+        AppVO appVO = new AppVO();
+        BeanUtil.copyProperties(app, appVO);
+
+        // 3. 关联查询并设置创建者用户信息
+        // 为了在前端显示应用由谁创建，需要查询并填充 UserVO 信息
+        Long userId = app.getUserId(); // 获取应用所属用户的ID
+        if (userId != null) {
+            // 根据用户ID查询用户实体
+            User user = userService.getById(userId);
+            // 将用户实体转换为脱敏的用户VO（不包含密码等敏感信息）
+            UserVO userVO = userService.getUserVO(user);
+            // 将用户VO设置到应用VO中
+            appVO.setUser(userVO);
+        }
+
+        // 4. 返回填充好信息的VO对象
+        return appVO;
+    }
+
+    /**
+     * 根据应用查询请求参数 (AppQueryRequest) 构建 MyBatis-Plus 的查询条件包装器 (QueryWrapper)。
+     * 用于动态生成 SQL 查询语句，支持按ID、名称、生成类型、部署标识、优先级、创建者等多种条件进行筛选。
+     *
+     * @param appQueryRequest 包含查询条件、分页和排序信息的请求对象。
+     * @return QueryWrapper<MyBatis-Plus 的查询条件包装器。
+     */
+    @Override
+    public QueryWrapper getQueryWrapper(AppQueryRequest appQueryRequest) {
+        // 1. 校验请求参数是否为空
+        if (appQueryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+
+        // 2. 从请求对象中提取查询条件
+        // 从 AppQueryRequest 中获取各个可能的查询字段
+        Long id = appQueryRequest.getId();
+        String appName = appQueryRequest.getAppName();       // 应用名称 (模糊查询)
+        String cover = appQueryRequest.getCover();           // 应用封面 (模糊查询)
+        String initPrompt = appQueryRequest.getInitPrompt(); // 应用初始化提示词 (模糊查询)
+        String codeGenType = appQueryRequest.getCodeGenType(); // 代码生成类型 (精确查询)
+        String deployKey = appQueryRequest.getDeployKey();   // 部署标识 (精确查询)
+        Integer priority = appQueryRequest.getPriority();    // 优先级 (精确查询)
+        Long userId = appQueryRequest.getUserId();          // 创建用户ID (精确查询)
+        String sortField = appQueryRequest.getSortField();   // 排序字段
+        String sortOrder = appQueryRequest.getSortOrder();   // 排序方向 (ascend/descend)
+
+        // 3. 构建并返回查询条件包装器
+        // 使用 QueryWrapper.create() 初始化，并链式调用条件方法
+        return QueryWrapper.create()
+                .eq("id", id)
+                .like("appName", appName)
+                .like("cover", cover)
+                .like("initPrompt", initPrompt)
+                .eq("codeGenType", codeGenType)
+                .eq("deployKey", deployKey)
+                .eq("priority", priority)
+                .eq("userId", userId)
+                .orderBy(sortField, "ascend".equals(sortOrder));
+    }
+
+    /**
+     * 将数据库应用实体列表 (List<App>) 转换为应用视图对象列表 (List<AppVO>)。
+     * 为了优化性能，这里采用批量查询用户信息的方式来避免 N+1 查询问题。
+     *
+     * @param appList 数据库中的应用实体对象列表。
+     * @return List<AppVO> 脱敏后的应用视图对象列表；如果输入的 appList 为空或为 null，则返回空的 ArrayList。
+     */
+    @Override
+    public List<AppVO> getAppVOList(List<App> appList) {
+        // 1. 校验输入参数
+        if (CollUtil.isEmpty(appList)) {
+            return new ArrayList<>();
+        }
+
+        // 2. 批量查询所有相关的用户信息，以避免对每个App都单独查询一次用户
+        // 2.1. 收集所有应用关联的用户ID集合
+        // 遍历应用列表，提取每个App的userId，并收集到一个Set中，以去除重复的ID
+        Set<Long> userIds = appList.stream()
+                .map(App::getUserId) // 提取每个App的userId字段
+                .collect(Collectors.toSet()); // 收集为Set，自动去重
+
+        // 2.2. 一次性查询所有用户，并将其转换为 Map<ID, UserVO> 的形式，方便后续快速查找
+        // 调用userService的批量查询方法，一次性获取所有需要的用户实体
+        // 然后将这些用户实体转换为脱敏的UserVO，并以用户ID为key存入Map中
+        Map<Long, UserVO> userVOMap = userService.listByIds(userIds).stream()
+                .collect(Collectors.toMap(
+                        User::getId,             // Map的key是用户的ID
+                        userService::getUserVO   // Map的value是该用户的脱敏VO对象
+                ));
+
+        // 3. 遍历应用列表，为每个应用设置其对应的用户信息，并最终收集为AppVO列表
+        // 对 appList 中的每个 App 对象进行处理
+        return appList.stream().map(app -> {
+            // 3.1. 调用单个转换方法获取基本的AppVO（包含应用自身信息，但user字段可能为null）
+            AppVO appVO = getAppVO(app);
+
+            // 3.2. 从预先查询好的Map中根据app的userId快速获取对应的用户VO，并设置到AppVO中
+            // 这样避免了再次数据库查询，提高了效率
+            UserVO userVO = userVOMap.get(app.getUserId());
+            appVO.setUser(userVO);
+
+            // 3.3. 返回填充好用户信息的AppVO
+            return appVO;
+        }).collect(Collectors.toList()); // 将处理后的流收集为List<AppVO>
+    }
+
+}
