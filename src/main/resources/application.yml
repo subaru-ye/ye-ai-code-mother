@@ -3,6 +3,14 @@ spring:
     name: ye-ai-code-mother-backend
   profiles:
     active: local
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      ttl: 3600
+  session:
+    store-type: redis
+    timeout: 2592000
 
   # mysql
   datasource:
@@ -15,6 +23,9 @@ server:
   port: 8123
   servlet:
     context-path: /api
+    session:
+      cookie:
+        max-age: 2592000
 # springdoc-openapi
 springdoc:
   group-configs:
