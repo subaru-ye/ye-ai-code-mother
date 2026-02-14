@@ -1,4 +1,4 @@
-package com.ye.yeaicodemother.saver;
+package com.ye.yeaicodemother.core.saver;
 
 import cn.hutool.core.util.StrUtil;
 import com.ye.yeaicodemother.ai.model.HtmlCodeResult;

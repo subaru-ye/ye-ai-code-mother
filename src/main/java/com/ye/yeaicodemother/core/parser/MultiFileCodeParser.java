@@ -1,4 +1,4 @@
-package com.ye.yeaicodemother.parser;
+package com.ye.yeaicodemother.core.parser;
 
 import com.ye.yeaicodemother.ai.model.MultiFileCodeResult;
 
