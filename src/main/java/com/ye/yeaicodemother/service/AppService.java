@@ -2,6 +2,7 @@ package com.ye.yeaicodemother.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import com.ye.yeaicodemother.model.dto.app.AppAddRequest;
 import com.ye.yeaicodemother.model.dto.app.AppQueryRequest;
 import com.ye.yeaicodemother.model.entity.App;
 import com.ye.yeaicodemother.model.entity.User;
@@ -36,6 +37,15 @@ public interface AppService extends IService<App> {
     String deployApp(Long appId, User loginUser);
 
     void generateAppScreenshotAsync(Long appId, String appUrl);
+
+    /**
+     * 创建应用
+     *
+     * @param appAddRequest
+     * @param loginUser
+     * @return
+     */
+    Long createApp(AppAddRequest appAddRequest, User loginUser);
 
     /**
      * 将数据库应用实体 (App) 转换为应用视图对象 (AppVO)。

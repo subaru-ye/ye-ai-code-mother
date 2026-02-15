@@ -6,6 +6,9 @@ target/
 
 ### CUSTOM ###
 application-local.yml
+tmp/code_deploy
+tmp/screenshot
+tmp/code_output
 
 ### STS ###
 .apt_generated
