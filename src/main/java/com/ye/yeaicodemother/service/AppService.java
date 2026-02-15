@@ -35,6 +35,8 @@ public interface AppService extends IService<App> {
      */
     String deployApp(Long appId, User loginUser);
 
+    void generateAppScreenshotAsync(Long appId, String appUrl);
+
     /**
      * 将数据库应用实体 (App) 转换为应用视图对象 (AppVO)。
      * 主要用于将应用信息脱敏后返回给前端，并关联查询创建者信息。
