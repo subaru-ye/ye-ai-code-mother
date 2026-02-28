@@ -1,14 +1,11 @@
 package com.ye.yeaicodemother.core.handler;
 
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.ye.yeaicodemother.ai.model.message.*;
 import com.ye.yeaicodemother.ai.tools.BaseTool;
 import com.ye.yeaicodemother.ai.tools.ToolManager;
-import com.ye.yeaicodemother.constant.AppConstant;
-import com.ye.yeaicodemother.core.builder.VueProjectBuilder;
 import com.ye.yeaicodemother.model.entity.User;
 import com.ye.yeaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.ye.yeaicodemother.service.ChatHistoryService;
@@ -28,8 +25,8 @@ import java.util.Set;
 @Component
 public class JsonMessageStreamHandler {
 
-    @Resource
-    private VueProjectBuilder vueProjectBuilder;
+//    @Resource
+//    private VueProjectBuilder vueProjectBuilder;
 
     @Resource
     private ToolManager toolManager;
@@ -62,8 +59,8 @@ public class JsonMessageStreamHandler {
                     String aiResponse = chatHistoryStringBuilder.toString();
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
                     // 异步构造 Vue 项目
-                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                    vueProjectBuilder.buildProjectAsync(projectPath);
+//                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+//                    vueProjectBuilder.buildProjectAsync(projectPath);
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息
