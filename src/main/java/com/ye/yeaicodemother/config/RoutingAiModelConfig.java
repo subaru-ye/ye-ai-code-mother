@@ -6,7 +6,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.Primary;
 
 @Configuration
 @ConfigurationProperties(prefix = "langchain4j.open-ai.routing-chat-model")
@@ -31,7 +31,7 @@ public class RoutingAiModelConfig {
      * 创建用于路由判断的ChatModel
      */
     @Bean
-    @Scope("prototype")
+    @Primary
     public ChatModel routingChatModelPrototype() {
         return OpenAiChatModel.builder()
                 .apiKey(apiKey)

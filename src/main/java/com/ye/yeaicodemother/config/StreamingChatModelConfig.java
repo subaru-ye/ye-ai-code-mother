@@ -6,7 +6,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.Primary;
 
 /**
  * 流式对话模型配置
@@ -34,7 +34,7 @@ public class StreamingChatModelConfig {
      * 流式模型
      */
     @Bean
-    @Scope("prototype")
+    @Primary
     public StreamingChatModel streamingChatModelPrototype() {
         return OpenAiStreamingChatModel.builder()
                 .apiKey(apiKey)
