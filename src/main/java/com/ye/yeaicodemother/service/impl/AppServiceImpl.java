@@ -113,7 +113,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         }
 
         // 5. 持久化用户消息：在调用 AI 前先保存，确保历史记录完整性
-        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        boolean addChatMessageResult = chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        ThrowUtils.throwIf(!addChatMessageResult, ErrorCode.SYSTEM_ERROR, "保存用户消息失败");
 
         // 6. 调用统一 AI 生成门面
         Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);

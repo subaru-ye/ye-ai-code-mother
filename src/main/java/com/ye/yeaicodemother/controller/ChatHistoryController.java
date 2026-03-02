@@ -14,12 +14,10 @@ import com.ye.yeaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import com.ye.yeaicodemother.model.entity.ChatHistory;
 import com.ye.yeaicodemother.service.ChatHistoryService;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 对话历史 控制层。
@@ -37,7 +35,7 @@ public class ChatHistoryController {
     private UserService userService;
 
     /**
-     * 分页查询某个应用的对话历史（游标查询）
+     * 分页查询指定应用的对话历史（游标查询）
      *
      * @param appId          应用ID
      * @param pageSize       页面大小

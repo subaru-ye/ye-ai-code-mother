@@ -4,8 +4,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.ye.yeaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
 import com.ye.yeaicodemother.ai.tools.ToolManager;
-import com.ye.yeaicodemother.exception.BusinessException;
-import com.ye.yeaicodemother.exception.ErrorCode;
 import com.ye.yeaicodemother.model.enums.CodeGenTypeEnum;
 import com.ye.yeaicodemother.service.ChatHistoryService;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
@@ -16,10 +14,11 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
+
+import static com.ye.yeaicodemother.utils.CacheKeyUtils.buildAiServiceCacheKey;
 
 /**
  * AI 代码生成服务工厂类
@@ -79,23 +78,8 @@ public class AiCodeGeneratorServiceFactory {
             .maximumSize(1000)
             .expireAfterWrite(Duration.ofMinutes(30))
             .expireAfterAccess(Duration.ofMinutes(10))
-            .removalListener((key, value, cause) -> {
-                log.debug("AI 服务实例被移除，缓存键: {}, 原因: {}", key, cause);
-            })
+            .removalListener((key, value, cause) -> log.debug("AI 服务实例被移除，缓存键: {}, 原因: {}", key, cause))
             .build();
-
-    /**
-     * 根据 appId 获取默认类型（HTML）的 AI 服务实例（带缓存）
-     * <p>
-     * 此方法主要用于兼容旧逻辑或简单场景。
-     * </p>
-     *
-     * @param appId 应用 ID，用于隔离不同用户的对话上下文
-     * @return 对应的 AI 服务实例
-     */
-    public AiCodeGeneratorService getAiCodeGeneratorService(long appId) {
-        return getAiCodeGeneratorService(appId, CodeGenTypeEnum.HTML);
-    }
 
     /**
      * 根据 appId 和代码生成类型获取 AI 服务实例（带缓存）
@@ -108,19 +92,14 @@ public class AiCodeGeneratorServiceFactory {
      * @return 对应配置的 AI 服务实例
      */
     public AiCodeGeneratorService getAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
-        String cacheKey = buildCacheKey(appId, codeGenType);
+        if (appId <= 0) {
+            throw new IllegalArgumentException("appId 必须大于 0");
+        }
+        if (codeGenType == null) {
+            throw new IllegalArgumentException("codeGenType 不能为空");
+        }
+        String cacheKey = buildAiServiceCacheKey(appId, codeGenType);
         return serviceCache.get(cacheKey, key -> createAiCodeGeneratorService(appId, codeGenType));
-    }
-
-    /**
-     * 构建缓存键：格式为 "appId_codeGenTypeValue"
-     *
-     * @param appId       应用 ID
-     * @param codeGenType 代码生成类型枚举
-     * @return 缓存唯一键
-     */
-    private String buildCacheKey(long appId, CodeGenTypeEnum codeGenType) {
-        return appId + "_" + codeGenType.getValue();
     }
 
     /**
@@ -129,8 +108,8 @@ public class AiCodeGeneratorServiceFactory {
      * - 为每个 appId 初始化独立的 {@link MessageWindowChatMemory}
      * - 从数据库加载最近 20 条历史消息到记忆中
      * - 根据 codeGenType 选择不同的模型和功能配置：
-     *   • VUE_PROJECT：启用推理模型 + 工具调用 + 幻觉防护
-     *   • HTML / MULTI_FILE：使用默认流式模型，无工具调用
+     * • VUE_PROJECT：启用推理模型 + 工具调用 + 幻觉防护
+     * • HTML / MULTI_FILE：使用默认流式模型，无工具调用
      * </p>
      *
      * @param appId       应用 ID
@@ -146,7 +125,9 @@ public class AiCodeGeneratorServiceFactory {
                 .maxMessages(20)
                 .build();
         // 从数据库加载历史对话到记忆中
-        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        int loadedCount = chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        log.info("为 appId {} 加载 {} 条历史对话到记忆中", appId, loadedCount);
+
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {
             // Vue 项目生成使用推理模型
@@ -154,7 +135,7 @@ public class AiCodeGeneratorServiceFactory {
                     .chatModel(chatModel)
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
-                    .tools(toolManager.getAllTools())
+                    .tools((Object) toolManager.getAllTools())
                     // 处理工具调用幻觉问题
                     .hallucinatedToolNameStrategy(toolExecutionRequest ->
                             ToolExecutionResultMessage.from(toolExecutionRequest,
@@ -169,23 +150,8 @@ public class AiCodeGeneratorServiceFactory {
                     .chatMemory(chatMemory)
                     .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
                     .build();
-            default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR,
-                    "不支持的代码生成类型: " + codeGenType.getValue());
         };
     }
 
-    /**
-     * Spring Bean：提供一个默认的全局 AI 服务实例（appId=0）
-     * <p>
-     * 主要用于非用户上下文场景（如系统初始化、测试等），
-     * 实际业务中应优先使用 {@link #getAiCodeGeneratorService(long, CodeGenTypeEnum)}。
-     * </p>
-     *
-     * @return 默认 AI 服务实例
-     */
-    @Bean
-    public AiCodeGeneratorService aiCodeGeneratorService() {
-        return getAiCodeGeneratorService(0);
-    }
 }
 
