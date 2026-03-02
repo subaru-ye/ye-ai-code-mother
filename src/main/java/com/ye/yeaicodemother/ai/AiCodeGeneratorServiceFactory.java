@@ -21,25 +21,50 @@ import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
 
+/**
+ * AI 代码生成服务工厂类
+ * <p>
+ * 负责根据 appId 和代码生成类型（HTML / 多文件 / Vue 项目）动态创建并缓存 {@link AiCodeGeneratorService} 实例。
+ * 每个 appId 对应独立的对话记忆（基于 Redis），确保多用户会话隔离。
+ * </p>
+ */
 @Configuration
 @Slf4j
 public class AiCodeGeneratorServiceFactory {
 
+    /**
+     * 全局共享的非流式聊天模型
+     */
     @Resource
     private ChatModel chatModel;
 
+    /**
+     * 默认流式聊天模型
+     */
     @Resource
     private StreamingChatModel openAiStreamingChatModel;
 
+    /**
+     * 推理流式聊天模型
+     */
     @Resource
     private StreamingChatModel reasoningStreamingChatModel;
 
+    /**
+     * 基于 Redis 的聊天记忆存储，用于持久化多轮对话上下文
+     */
     @Resource
     private RedisChatMemoryStore redisChatMemoryStore;
 
+    /**
+     * 聊天历史服务，用于从数据库加载历史消息到内存
+     */
     @Resource
     private ChatHistoryService chatHistoryService;
 
+    /**
+     * 工具管理器，提供所有可用的 AI 工具
+     */
     @Resource
     private ToolManager toolManager;
 
@@ -60,14 +85,27 @@ public class AiCodeGeneratorServiceFactory {
             .build();
 
     /**
-     * 根据 appId 获取服务（带缓存）这个方法是为了兼容历史逻辑
+     * 根据 appId 获取默认类型（HTML）的 AI 服务实例（带缓存）
+     * <p>
+     * 此方法主要用于兼容旧逻辑或简单场景。
+     * </p>
+     *
+     * @param appId 应用 ID，用于隔离不同用户的对话上下文
+     * @return 对应的 AI 服务实例
      */
     public AiCodeGeneratorService getAiCodeGeneratorService(long appId) {
         return getAiCodeGeneratorService(appId, CodeGenTypeEnum.HTML);
     }
 
     /**
-     * 根据 appId 和代码生成类型获取服务（带缓存）
+     * 根据 appId 和代码生成类型获取 AI 服务实例（带缓存）
+     * <p>
+     * 若缓存中不存在，则创建新实例并加入缓存。
+     * </p>
+     *
+     * @param appId       应用 ID，用于对话隔离
+     * @param codeGenType 代码生成类型（HTML / MULTI_FILE / VUE_PROJECT）
+     * @return 对应配置的 AI 服务实例
      */
     public AiCodeGeneratorService getAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
         String cacheKey = buildCacheKey(appId, codeGenType);
@@ -75,15 +113,29 @@ public class AiCodeGeneratorServiceFactory {
     }
 
     /**
-     * 构建缓存键
+     * 构建缓存键：格式为 "appId_codeGenTypeValue"
+     *
+     * @param appId       应用 ID
+     * @param codeGenType 代码生成类型枚举
+     * @return 缓存唯一键
      */
     private String buildCacheKey(long appId, CodeGenTypeEnum codeGenType) {
         return appId + "_" + codeGenType.getValue();
     }
 
-
     /**
-     * 创建新的 AI 服务实例
+     * 创建新的 AI 代码生成服务实例
+     * <p>
+     * - 为每个 appId 初始化独立的 {@link MessageWindowChatMemory}
+     * - 从数据库加载最近 20 条历史消息到记忆中
+     * - 根据 codeGenType 选择不同的模型和功能配置：
+     *   • VUE_PROJECT：启用推理模型 + 工具调用 + 幻觉防护
+     *   • HTML / MULTI_FILE：使用默认流式模型，无工具调用
+     * </p>
+     *
+     * @param appId       应用 ID
+     * @param codeGenType 代码生成类型
+     * @return 新构建的 AI 服务代理实例
      */
     private AiCodeGeneratorService createAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
         // 根据 appId 构建独立的对话记忆
@@ -122,11 +174,14 @@ public class AiCodeGeneratorServiceFactory {
         };
     }
 
-
-
-
     /**
-     * 创建 AI 代码生成器服务
+     * Spring Bean：提供一个默认的全局 AI 服务实例（appId=0）
+     * <p>
+     * 主要用于非用户上下文场景（如系统初始化、测试等），
+     * 实际业务中应优先使用 {@link #getAiCodeGeneratorService(long, CodeGenTypeEnum)}。
+     * </p>
+     *
+     * @return 默认 AI 服务实例
      */
     @Bean
     public AiCodeGeneratorService aiCodeGeneratorService() {

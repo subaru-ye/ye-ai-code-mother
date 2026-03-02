@@ -8,7 +8,6 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.ye.yeaicodemother.ai.AiCodeGenTypeRoutingService;
-import com.ye.yeaicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.ye.yeaicodemother.constant.AppConstant;
 import com.ye.yeaicodemother.core.AiCodeGeneratorFacade;
 import com.ye.yeaicodemother.core.builder.VueProjectBuilder;
@@ -73,28 +72,52 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     @Resource
     private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
 
+    /**
+     * 与指定 AI 应用进行对话以生成代码（流式响应）
+     * <p>
+     * 该方法实现完整的“用户提问 → AI 生成 → 流式返回 → 历史记录”闭环，核心流程如下：
+     * 1. 校验参数合法性（appId、message）；
+     * 2. 查询并验证应用归属权（仅创建者可操作）；
+     * 3. 解析应用预设的代码生成类型（HTML / 多文件 / Vue 项目）；
+     * 4. 持久化用户输入消息到聊天历史；
+     * 5. 调用统一 AI 代码生成门面服务，获取 SSE 流；
+     * 6. 在流传输过程中/结束后，自动保存 AI 响应到聊天历史。
+     * </p>
+     *
+     * @param appId     应用 ID，标识要交互的 AI 应用实例
+     * @param message   用户自然语言提示词
+     * @param loginUser 当前登录用户，用于权限校验与消息归属
+     * @return Flux<String> 流式响应，每个元素为 JSON 字符串，包含 AI 文本、工具调用、错误等事件
+     */
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
-        // 1. 参数校验
+
+        // 1. 基础参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 错误");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "提示词不能为空");
-        // 2. 查询应用信息
+
+        // 2. 查询应用元数据
         App app = this.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+
         // 3. 权限校验，仅本人可以和自己的应用对话
         if (!app.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
+
         // 4. 获取应用的代码生成类型
         String codeGenType = app.getCodeGenType();
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "应用代码生成类型错误");
         }
-        // 5. 在调用 AI 前，先保存用户消息到数据库中
+
+        // 5. 持久化用户消息：在调用 AI 前先保存，确保历史记录完整性
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
-        // 6. 调用 AI 生成代码（流式）
+
+        // 6. 调用统一 AI 生成门面
         Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
+
         // 7. 收集 AI 响应的内容，并且在完成后保存记录到对话历史
         return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenTypeEnum);
     }
@@ -111,28 +134,34 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+
         // 2. 查询应用信息
         App app = this.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+
         // 3. 验证用户是否有权限部署该应用，仅本人可以部署
         if (!app.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限部署该应用");
         }
+
         // 4. 检查是否已有 deployKey
         String deployKey = app.getDeployKey();
         // 没有则生成 6 位 deployKey（大小写字母 + 数字）
         if (StrUtil.isBlank(deployKey)) {
             deployKey = RandomUtil.randomString(6);
         }
+
         // 5. 获取代码生成类型，构建源目录路径
         String codeGenType = app.getCodeGenType();
         String sourceDirName = codeGenType + "_" + appId;
         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+
         // 6. 检查源目录是否存在
         File sourceDir = new File(sourceDirPath);
         if (!sourceDir.exists() || !sourceDir.isDirectory()) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用代码不存在，请先生成代码");
         }
+
         // 7. Vue 项目特殊处理：执行构建
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
         if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
@@ -145,6 +174,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
             // 构建完成后，需要将构建后的文件复制到部署目录
             sourceDir = distDir;
         }
+
         // 8. 复制文件到部署目录
         String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
         try {
@@ -152,6 +182,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署失败：" + e.getMessage());
         }
+
         // 9. 更新数据库
         App updateApp = new App();
         updateApp.setId(appId);
@@ -159,10 +190,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean updateResult = this.updateById(updateApp);
         ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
+
         // 10. 得到可访问的 URL 地址
         String appDeployUrl = String.format("%s/%s", AppConstant.CODE_DEPLOY_HOST, deployKey);
+
         // 11. 异步生成截图并且更新应用封面
         generateAppScreenshotAsync(appId, appDeployUrl);
+
         return appDeployUrl;
     }
 
@@ -189,32 +223,43 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
 
     /**
      * 创建应用
+     * <p>
+     * 该方法完成以下核心流程：
+     * 1. 校验用户输入的初始化 Prompt 是否有效；
+     * 2. 基于 Prompt 自动生成应用名称（截取前12个字符）；
+     * 3. 调用 AI 路由服务，智能判断应使用哪种代码生成类型（HTML / 多文件 / Vue 项目）；
+     * 4. 持久化应用元数据到数据库。
+     * </p>
      *
-     * @param appAddRequest
-     * @param loginUser
-     * @return
+     * @param appAddRequest 用户提交的应用创建请求，必须包含非空的 initPrompt
+     * @param loginUser     当前登录用户，用于绑定应用归属
+     * @return 新创建应用的唯一 ID（数据库主键）
      */
     @Override
     public Long createApp(AppAddRequest appAddRequest, User loginUser) {
         // 参数校验
         String initPrompt = appAddRequest.getInitPrompt();
         ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
+
         // 构造入库对象
         App app = new App();
         BeanUtil.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
-        // 应用名称暂时为 initPrompt 前 12 位
+
+        // 自动生成应用名：暂时为 initPrompt 前 12 位
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
+
         // 使用 AI 智能选择代码生成类型
         CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
         app.setCodeGenType(selectedCodeGenType.getValue());
-        // 插入数据库
+
+        // 持久化到数据库
         boolean result = this.save(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+
         log.info("应用创建成功，ID: {}, 类型: {}", app.getId(), selectedCodeGenType.getValue());
         return app.getId();
     }
-
 
     /**
      * 删除应用时关联删除对话历史
@@ -242,7 +287,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         // 删除应用
         return super.removeById(id);
     }
-
 
     /**
      * 将数据库应用实体 (App) 转换为应用视图对象 (AppVO)。

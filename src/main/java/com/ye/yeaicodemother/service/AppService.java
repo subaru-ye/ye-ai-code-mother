@@ -19,11 +19,21 @@ import java.util.List;
 public interface AppService extends IService<App> {
 
     /**
-     * 通过对话生成应用代码
+     * 与指定 AI 应用进行对话以生成代码（流式响应）
+     * <p>
+     * 该方法实现完整的“用户提问 → AI 生成 → 流式返回 → 历史记录”闭环，核心流程如下：
+     * 1. 校验参数合法性（appId、message）；
+     * 2. 查询并验证应用归属权（仅创建者可操作）；
+     * 3. 解析应用预设的代码生成类型（HTML / 多文件 / Vue 项目）；
+     * 4. 持久化用户输入消息到聊天历史；
+     * 5. 调用统一 AI 代码生成门面服务，获取 SSE 流；
+     * 6. 在流传输过程中/结束后，自动保存 AI 响应到聊天历史。
+     * </p>
      *
-     * @param appId 应用 ID
-     * @param message 提示词
-     * @param loginUser 登录用户
+     * @param appId     应用 ID，标识要交互的 AI 应用实例
+     * @param message   用户自然语言提示词
+     * @param loginUser 当前登录用户，用于权限校验与消息归属
+     * @return Flux<String> 流式响应，每个元素为 JSON 字符串，包含 AI 文本、工具调用、错误等事件
      */
     Flux<String> chatToGenCode(Long appId, String message, User loginUser);
 
@@ -40,10 +50,17 @@ public interface AppService extends IService<App> {
 
     /**
      * 创建应用
+     * <p>
+     * 该方法完成以下核心流程：
+     * 1. 校验用户输入的初始化 Prompt 是否有效；
+     * 2. 基于 Prompt 自动生成应用名称（截取前12个字符）；
+     * 3. 调用 AI 路由服务，智能判断应使用哪种代码生成类型（HTML / 多文件 / Vue 项目）；
+     * 4. 持久化应用元数据到数据库。
+     * </p>
      *
-     * @param appAddRequest
-     * @param loginUser
-     * @return
+     * @param appAddRequest 用户提交的应用创建请求，必须包含非空的 initPrompt
+     * @param loginUser     当前登录用户，用于绑定应用归属
+     * @return 新创建应用的唯一 ID（数据库主键）
      */
     Long createApp(AppAddRequest appAddRequest, User loginUser);
 

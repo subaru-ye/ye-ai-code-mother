@@ -9,7 +9,7 @@ import com.ye.yeaicodemother.model.enums.CodeGenTypeEnum;
 /**
  * 多文件代码保存器
  */
-public class MultiFileCodeFileSaverTemplate extends CodeFileSaverTemplate<MultiFileCodeResult> {
+public class MultiFileCodeFileSaver extends CodeFileSaverTemplate<MultiFileCodeResult> {
 
     @Override
     public CodeGenTypeEnum getCodeType() {

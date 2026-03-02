@@ -14,9 +14,9 @@ import java.io.File;
  */
 public class CodeFileSaverExecutor {
 
-    private static final HtmlCodeFileSaverTemplate htmlCodeFileSaver = new HtmlCodeFileSaverTemplate();
+    private static final HtmlCodeFileSaver htmlCodeFileSaver = new HtmlCodeFileSaver();
 
-    private static final MultiFileCodeFileSaverTemplate multiFileCodeFileSaver = new MultiFileCodeFileSaverTemplate();
+    private static final MultiFileCodeFileSaver multiFileCodeFileSaver = new MultiFileCodeFileSaver();
 
     /**
      * 执行代码保存

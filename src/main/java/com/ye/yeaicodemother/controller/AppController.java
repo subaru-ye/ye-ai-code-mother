@@ -16,7 +16,6 @@ import com.ye.yeaicodemother.exception.ErrorCode;
 import com.ye.yeaicodemother.exception.ThrowUtils;
 import com.ye.yeaicodemother.model.dto.app.*;
 import com.ye.yeaicodemother.model.entity.User;
-import com.ye.yeaicodemother.model.enums.CodeGenTypeEnum;
 import com.ye.yeaicodemother.model.vo.AppVO;
 import com.ye.yeaicodemother.ratelimter.annotation.RateLimit;
 import com.ye.yeaicodemother.ratelimter.enums.RateLimitType;
@@ -54,6 +53,8 @@ public class AppController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private ProjectDownloadService projectDownloadService;
 
     /**
      * 通过聊天方式生成代码的 API 端点
@@ -122,10 +123,6 @@ public class AppController {
         String deployUrl = appService.deployApp(appId, loginUser);
         return ResultUtils.success(deployUrl);
     }
-
-
-    @Resource
-    private ProjectDownloadService projectDownloadService;
 
     /**
      * 下载应用代码

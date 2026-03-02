@@ -2,6 +2,7 @@ spring:
   application:
     name: ye-ai-code-mother-backend
   profiles:
+    # 激活本地环境
     active: local
   data:
     redis:
