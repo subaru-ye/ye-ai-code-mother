@@ -61,11 +61,13 @@ public class ProjectDownloadServiceImpl implements ProjectDownloadService {
         ThrowUtils.throwIf(!projectDir.exists(), ErrorCode.NOT_FOUND_ERROR, "项目目录不存在");
         ThrowUtils.throwIf(!projectDir.isDirectory(), ErrorCode.PARAMS_ERROR, "指定路径不是目录");
         log.info("开始打包下载项目: {} -> {}.zip", projectPath, downloadFileName);
+
         // 设置 HTTP 响应头
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType("application/zip");
         response.addHeader("Content-Disposition",
                 String.format("attachment; filename=\"%s.zip\"", downloadFileName));
+
         // 定义文件过滤器
         FileFilter filter = file -> isPathAllowed(projectDir.toPath(), file.toPath());
         try {

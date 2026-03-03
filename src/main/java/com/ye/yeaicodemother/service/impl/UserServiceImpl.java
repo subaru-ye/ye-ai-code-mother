@@ -7,17 +7,24 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.ye.yeaicodemother.exception.BusinessException;
 import com.ye.yeaicodemother.exception.ErrorCode;
+import com.ye.yeaicodemother.exception.ThrowUtils;
+import com.ye.yeaicodemother.manager.CosManager;
 import com.ye.yeaicodemother.model.dto.user.UserQueryRequest;
+import com.ye.yeaicodemother.model.dto.user.UserUpdateMyRequest;
 import com.ye.yeaicodemother.model.entity.User;
 import com.ye.yeaicodemother.mapper.UserMapper;
 import com.ye.yeaicodemother.model.enums.UserRoleEnum;
 import com.ye.yeaicodemother.model.vo.LoginUserVO;
 import com.ye.yeaicodemother.model.vo.UserVO;
 import com.ye.yeaicodemother.service.UserService;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,6 +38,9 @@ import static com.ye.yeaicodemother.constant.UserConstant.USER_LOGIN_STATE;
  */
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Resource
+    private CosManager cosManager;
 
     /**
      * 用户注册
@@ -251,6 +261,89 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         request.getSession().removeAttribute(USER_LOGIN_STATE);
 
         // 3. 返回操作成功标志
+        return true;
+    }
+
+    /**
+     * 上传并更新当前登录用户头像
+     *
+     * @param file    头像文件
+     * @param request HTTP 请求对象
+     * @return String 头像访问 URL
+     */
+    @Override
+    public String uploadAvatar(MultipartFile file, HttpServletRequest request) {
+        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "头像文件不能为空");
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+
+        String contentType = file.getContentType();
+        if (StrUtil.isNotBlank(contentType) && !contentType.startsWith("image/")) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "仅支持上传图片类型文件");
+        }
+
+        User loginUser = this.getLoginUser(request);
+        Long userId = loginUser.getId();
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.NOT_LOGIN_ERROR);
+
+        String originalFilename = file.getOriginalFilename();
+        String suffix = "";
+        if (StrUtil.isNotBlank(originalFilename) && originalFilename.contains(".")) {
+            suffix = originalFilename.substring(originalFilename.lastIndexOf('.'));
+        } else {
+            suffix = ".jpg";
+        }
+        String key = String.format("/user/avatar/%d/%d%s", userId, System.currentTimeMillis(), suffix);
+
+        File tempFile = null;
+        try {
+            tempFile = File.createTempFile("avatar_" + userId + "_", suffix);
+            file.transferTo(tempFile);
+
+            String avatarUrl = cosManager.uploadFile(key, tempFile);
+            if (StrUtil.isBlank(avatarUrl)) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "头像上传失败");
+            }
+
+            User updateUser = new User();
+            updateUser.setId(userId);
+            updateUser.setUserAvatar(avatarUrl);
+            boolean updated = this.updateById(updateUser);
+            ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新头像信息失败");
+
+            return avatarUrl;
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "头像上传异常：" + e.getMessage());
+        } finally {
+            if (tempFile != null && tempFile.exists()) {
+                // 删除本地临时文件
+                //noinspection ResultOfMethodCallIgnored
+                tempFile.delete();
+            }
+        }
+    }
+
+    /**
+     * 更新当前登录用户的个人资料信息（仅本人）
+     *
+     * @param userUpdateMyRequest 用户更新本人信息请求
+     * @param request             HTTP 请求对象，用于获取用户会话（Session）
+     * @return boolean 是否更新成功
+     */
+    @Override
+    public boolean updateMyUser(UserUpdateMyRequest userUpdateMyRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(userUpdateMyRequest == null, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
+
+        User loginUser = this.getLoginUser(request);
+        Long userId = loginUser.getId();
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.NOT_LOGIN_ERROR);
+
+        User updateUser = new User();
+        updateUser.setId(userId);
+        BeanUtil.copyProperties(userUpdateMyRequest, updateUser);
+
+        boolean updated = this.updateById(updateUser);
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR);
         return true;
     }
 

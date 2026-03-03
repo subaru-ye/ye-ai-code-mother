@@ -14,7 +14,7 @@ public class OpenAiStreamChatModelConfig {
     public AsyncTaskExecutor langchain4jAsyncTaskExecutor() {
         ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
         taskExecutor.setThreadNamePrefix("my-LangChain4j-");
-        taskExecutor.setCorePoolSize(6);           // 核心线程数（建议 ≥ 2）
+        taskExecutor.setCorePoolSize(6);           // 核心线程数
         taskExecutor.setMaxPoolSize(10);            // 最大线程数
         taskExecutor.setQueueCapacity(100);         // 队列容量（防止内存溢出）
         taskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy()); // 拒绝策略

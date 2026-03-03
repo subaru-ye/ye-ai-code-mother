@@ -7,7 +7,6 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.ye.yeaicodemother.exception.BusinessException;
 import com.ye.yeaicodemother.exception.ErrorCode;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.OutputType;
@@ -28,39 +27,11 @@ import java.time.Duration;
 @Slf4j
 public class WebScreenshotUtils {
 
-    // 全局唯一的 WebDriver 实例，用于执行浏览器操作
-    private static volatile WebDriver webDriver=null;
-
     // 使用相对路径指向 resources 目录下的 ChromeDriver
     private static final String CHROME_DRIVER_PATH =
             System.getProperty("user.dir") + "/src/main/resources/web_drivers/chromedriver.exe";
     private static final int DEFAULT_WIDTH = 1600;
     private static final int DEFAULT_HEIGHT = 900;
-
-/*    // 全局静态初始化驱动程序：
-    static {
-        // 定义默认的浏览器窗口尺寸
-        final int DEFAULT_WIDTH = 1600;
-        final int DEFAULT_HEIGHT = 900;
-        // 初始化 WebDriver
-        webDriver = initChromeDriver(DEFAULT_WIDTH, DEFAULT_HEIGHT);
-    }*/
-
-    /**
-     * 应用关闭时，销毁 WebDriver 资源。
-     */
-    @PreDestroy
-    public static void destroy() {
-        if (webDriver != null) {
-            try {
-                webDriver.quit();
-            } catch (Exception e) {
-                log.warn("关闭 WebDriver 时出现异常", e);
-            } finally {
-                webDriver = null;
-            }
-        }
-    }
 
     /**
      * 生成网页截图并返回压缩后图片的文件路径。
@@ -75,36 +46,68 @@ public class WebScreenshotUtils {
             return null;
         }
         WebDriver driver = null;
+        String rootPath = null;
+        boolean success = false;
 
         try {
             // 每次调用创建新的 WebDriver 实例
             driver = getWebDriver();
 
             // 2. 创建临时目录
-            String rootPath = System.getProperty("user.dir") + "/tmp/screenshots/" + UUID.randomUUID().toString().substring(0, 8);
+            rootPath = System.getProperty("user.dir") + "/tmp/screenshots/" + UUID.randomUUID().toString().substring(0, 8);
             FileUtil.mkdir(rootPath);
-            // 构造原始图片保存路径
+
+            // 3. 构造路径
             final String IMAGE_SUFFIX = ".png";
             String imageSavePath = rootPath + File.separator + RandomUtil.randomNumbers(5) + IMAGE_SUFFIX;
-            // 3. 访问网页
+            final String COMPRESS_SUFFIX = "_compressed.jpg";
+            String compressedImagePath = rootPath + File.separator + RandomUtil.randomNumbers(5) + COMPRESS_SUFFIX;
+
+            // 4. 访问页面
             driver.get(webUrl);
             // 等待网页加载
             waitForPageLoad(driver);
-            // 4. 截图并保存原始图片
+
+            // 5. 截图并保存原始图片
             byte[] screenshotBytes = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BYTES);
             saveImage(screenshotBytes, imageSavePath);
             log.info("原始截图保存成功：{}", imageSavePath);
-            // 5. 压缩图片
-            final String COMPRESS_SUFFIX = "_compressed.jpg";
-            String compressedImagePath = rootPath + File.separator + RandomUtil.randomNumbers(5) + COMPRESS_SUFFIX;
+
+            // 6. 压缩图片
             compressImage(imageSavePath, compressedImagePath);
             log.info("压缩图片保存成功：{}", compressedImagePath);
-            // 6. 删除原始图片
+
+            // 7. 删除原始图片
             FileUtil.del(imageSavePath);
+            success = true;
+
             return compressedImagePath;
+
         } catch (Exception e) {
             log.error("网页截图失败：{}", webUrl, e);
             return null;
+        } finally {
+            // 无论成功失败，关闭 driver
+            if (driver != null) {
+                try {
+                    driver.quit(); // 会同时关闭 chromedriver 和 Chrome 进程
+                } catch (Exception ex) {
+                    log.warn("关闭 WebDriver 时出错", ex);
+                }
+            }
+            // 如果截图失败，清理整个临时目录
+            if (rootPath != null) {
+                try {
+                    FileUtil.del(rootPath);
+                    if (success) {
+                        log.info("截图成功，已清理临时目录: {}", rootPath);
+                    } else {
+                        log.info("截图失败，已清理临时目录: {}", rootPath);
+                    }
+                } catch (Exception ex) {
+                    log.warn("清理临时目录失败: {}", rootPath, ex);
+                }
+            }
         }
     }
 

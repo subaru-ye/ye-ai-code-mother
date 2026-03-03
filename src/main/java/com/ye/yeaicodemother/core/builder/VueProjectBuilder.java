@@ -8,16 +8,24 @@ import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 构建 Vue 项目
+ * Vue 项目构建器
+ * <p>
+ * 负责对已生成的 Vue 项目目录执行本地构建流程（npm install + npm run build），
+ * 验证是否能成功生成可部署的 dist 目录。
+ * </p>
  */
 @Slf4j
 @Component
 public class VueProjectBuilder {
 
     /**
-     * 异步构建 Vue 项目
+     * 异步启动 Vue 项目构建任务
+     * <p>
+     * 使用虚拟线程（Virtual Thread）在后台执行构建流程，避免阻塞主线程。
+     * 构建结果通过日志记录，不返回给调用方。
+     * </p>
      *
-     * @param projectPath
+     * @param projectPath 待构建的 Vue 项目根目录绝对路径（必须已存在且包含 package.json）
      */
     public void buildProjectAsync(String projectPath) {
         Thread.ofVirtual().name("vue-builder-" + System.currentTimeMillis())
@@ -31,10 +39,19 @@ public class VueProjectBuilder {
     }
 
     /**
-     * 构建 Vue 项目
+     * 同步执行 Vue 项目完整构建流程
+     * <p>
+     * 流程包括：
+     * <ol>
+     *   <li>校验项目目录和 package.json 存在；</li>
+     *   <li>执行 {@code npm install} 安装依赖（超时 5 分钟）；</li>
+     *   <li>执行 {@code npm run build} 构建项目（超时 3 分钟）；</li>
+     *   <li>验证 {@code dist} 目录是否生成。</li>
+     * </ol>
+     * </p>
      *
-     * @param projectPath 项目根目录路径
-     * @return 是否构建成功
+     * @param projectPath 项目根目录路径（必须为绝对路径）
+     * @return {@code true} 表示构建成功，{@code false} 表示任一环节失败
      */
     public boolean buildProject(String projectPath) {
         File projectDir = new File(projectPath);
@@ -71,51 +88,59 @@ public class VueProjectBuilder {
 
     /**
      * 执行 npm install 命令
+     *
+     * @param projectDir 项目根目录
+     * @return 是否成功执行（退出码为 0）
      */
     private boolean executeNpmInstall(File projectDir) {
         log.info("执行 npm install...");
-        String command = String.format("%s install", buildCommand("npm"));
+        String command = String.format("%s install", buildCommand());
         return executeCommand(projectDir, command, 300); // 5分钟超时
     }
 
     /**
      * 执行 npm run build 命令
+     *
+     * @param projectDir 项目根目录
+     * @return 是否成功执行（退出码为 0）
      */
     private boolean executeNpmBuild(File projectDir) {
         log.info("执行 npm run build...");
-        String command = String.format("%s run build", buildCommand("npm"));
+        String command = String.format("%s run build", buildCommand());
         return executeCommand(projectDir, command, 180); // 3分钟超时
     }
 
     /**
-     * 根据操作系统构造命令
+     * 根据操作系统类型构造可执行命令后缀
+     * <p>
+     * Windows 系统需使用 {@code npm.cmd}，其他系统（Linux/macOS）直接使用 {@code npm}。
+     * </p>
      *
-     * @param baseCommand
-     * @return
+     * @return 带平台后缀的完整命令（如 "npm.cmd" 或 "npm"）
      */
-    private String buildCommand(String baseCommand) {
+    private String buildCommand() {
         if (isWindows()) {
-            return baseCommand + ".cmd";
+            return "npm" + ".cmd";
         }
-        return baseCommand;
+        return "npm";
     }
 
     /**
-     * 操作系统检测
+     * 检测当前操作系统是否为 Windows
      *
-     * @return
+     * @return {@code true} 表示 Windows，否则为 Unix-like 系统
      */
     private boolean isWindows() {
         return System.getProperty("os.name").toLowerCase().contains("windows");
     }
 
     /**
-     * 执行命令
+     * 在指定工作目录下执行系统命令，并设置超时控制
      *
-     * @param workingDir     工作目录
-     * @param command        命令字符串
-     * @param timeoutSeconds 超时时间（秒）
-     * @return 是否执行成功
+     * @param workingDir     命令执行的工作目录
+     * @param command        完整命令字符串（如 "npm install"）
+     * @param timeoutSeconds 最大等待时间（秒），超时则强制终止进程
+     * @return {@code true} 表示命令成功执行（退出码为 0），否则返回 {@code false}
      */
     private boolean executeCommand(File workingDir, String command, int timeoutSeconds) {
         try {

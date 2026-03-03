@@ -38,16 +38,10 @@ public class AiCodeGeneratorServiceFactory {
     private ChatModel chatModel;
 
     /**
-     * 默认流式聊天模型
+     * 流式聊天模型
      */
     @Resource
     private StreamingChatModel openAiStreamingChatModel;
-
-    /**
-     * 推理流式聊天模型
-     */
-    @Resource
-    private StreamingChatModel reasoningStreamingChatModel;
 
     /**
      * 基于 Redis 的聊天记忆存储，用于持久化多轮对话上下文
@@ -133,7 +127,7 @@ public class AiCodeGeneratorServiceFactory {
             // Vue 项目生成使用推理模型
             case VUE_PROJECT -> AiServices.builder(AiCodeGeneratorService.class)
                     .chatModel(chatModel)
-                    .streamingChatModel(reasoningStreamingChatModel)
+                    .streamingChatModel(openAiStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
                     .tools((Object) toolManager.getAllTools())
                     // 处理工具调用幻觉问题

@@ -17,6 +17,7 @@ import com.ye.yeaicodemother.model.vo.UserVO;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import com.ye.yeaicodemother.service.UserService;
 
 import java.util.List;
@@ -236,6 +237,35 @@ public class UserController {
 
         // 4. 返回操作成功标志
         return ResultUtils.success(true);
+    }
+
+    /**
+     * 更新当前登录用户个人信息（仅本人）
+     *
+     * @param userUpdateMyRequest 用户更新本人信息请求体
+     * @param request             HTTP 请求对象，用于获取用户会话
+     * @return BaseResponse<Boolean> 更新结果
+     */
+    @PostMapping("/update/my")
+    public BaseResponse<Boolean> updateMyUser(@RequestBody UserUpdateMyRequest userUpdateMyRequest,
+                                              HttpServletRequest request) {
+        ThrowUtils.throwIf(userUpdateMyRequest == null, ErrorCode.PARAMS_ERROR);
+        boolean result = userService.updateMyUser(userUpdateMyRequest, request);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 上传并设置当前登录用户头像（仅本人）
+     *
+     * @param file    头像文件
+     * @param request HTTP 请求对象，用于获取用户会话
+     * @return BaseResponse<String> 头像访问 URL
+     */
+    @PostMapping("/avatar/upload")
+    public BaseResponse<String> uploadAvatar(@RequestPart("file") MultipartFile file,
+                                             HttpServletRequest request) {
+        String avatarUrl = userService.uploadAvatar(file, request);
+        return ResultUtils.success(avatarUrl);
     }
 
     /**

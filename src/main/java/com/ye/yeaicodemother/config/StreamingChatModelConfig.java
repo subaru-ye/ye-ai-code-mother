@@ -35,7 +35,7 @@ public class StreamingChatModelConfig {
      */
     @Bean
     @Primary
-    public StreamingChatModel streamingChatModelPrototype() {
+    public StreamingChatModel streamingChatModel() {
         return OpenAiStreamingChatModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)

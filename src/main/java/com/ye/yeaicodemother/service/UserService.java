@@ -3,10 +3,12 @@ package com.ye.yeaicodemother.service;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
 import com.ye.yeaicodemother.model.dto.user.UserQueryRequest;
+import com.ye.yeaicodemother.model.dto.user.UserUpdateMyRequest;
 import com.ye.yeaicodemother.model.entity.User;
 import com.ye.yeaicodemother.model.vo.LoginUserVO;
 import com.ye.yeaicodemother.model.vo.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -90,6 +92,24 @@ public interface UserService extends IService<User> {
      * @return boolean 操作是否成功。
      */
     boolean userLogout(HttpServletRequest request);
+
+    /**
+     * 上传并更新当前登录用户头像
+     *
+     * @param file    头像文件
+     * @param request HTTP 请求对象，用于获取用户会话（Session）
+     * @return String 头像访问 URL
+     */
+    String uploadAvatar(MultipartFile file, HttpServletRequest request);
+
+    /**
+     * 更新当前登录用户的个人资料信息（仅本人）
+     *
+     * @param userUpdateMyRequest 用户更新本人信息请求
+     * @param request             HTTP 请求对象，用于获取用户会话（Session）
+     * @return boolean 是否更新成功
+     */
+    boolean updateMyUser(UserUpdateMyRequest userUpdateMyRequest, HttpServletRequest request);
 
     /**
      * 根据用户查询请求参数 (UserQueryRequest) 构建 MyBatis-Plus 的查询条件包装器 (QueryWrapper)。

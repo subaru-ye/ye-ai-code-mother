@@ -32,7 +32,7 @@ public class RoutingAiModelConfig {
      */
     @Bean
     @Primary
-    public ChatModel routingChatModelPrototype() {
+    public ChatModel routingChatModel() {
         return OpenAiChatModel.builder()
                 .apiKey(apiKey)
                 .modelName(modelName)

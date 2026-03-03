@@ -70,7 +70,12 @@ public class JsonMessageStreamHandler {
     }
 
     /**
-     * 解析并收集 TokenStream 数据
+     * 解析单个 JSON 消息块，并根据消息类型生成前端可展示的内容，同时更新对话历史聚合器。
+     *
+     * @param chunk                    当前流中的 JSON 字符串消息块
+     * @param chatHistoryStringBuilder 用于聚合最终需持久化的完整 AI 响应内容（含工具交互）
+     * @param seenToolIds              已处理过的工具 ID 集合，用于避免重复输出同一工具调用
+     * @return 转换后的可展示字符串（若无需输出则返回空字符串），供前端实时渲染
      */
     private String handleJsonMessageChunk(String chunk, StringBuilder chatHistoryStringBuilder, Set<String> seenToolIds) {
         // 解析 JSON
