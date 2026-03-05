@@ -27,9 +27,10 @@ import java.time.Duration;
 @Slf4j
 public class WebScreenshotUtils {
 
-    // 使用相对路径指向 resources 目录下的 ChromeDriver
+//    本地用
+/*    // 使用相对路径指向 resources 目录下的 ChromeDriver
     private static final String CHROME_DRIVER_PATH =
-            System.getProperty("user.dir") + "/src/main/resources/web_drivers/chromedriver.exe";
+            System.getProperty("user.dir") + "/src/main/resources/web_drivers/chromedriver.exe";*/
     private static final int DEFAULT_WIDTH = 1600;
     private static final int DEFAULT_HEIGHT = 900;
 
@@ -46,8 +47,7 @@ public class WebScreenshotUtils {
             return null;
         }
         WebDriver driver = null;
-        String rootPath = null;
-        boolean success = false;
+        String rootPath;
 
         try {
             // 每次调用创建新的 WebDriver 实例
@@ -79,7 +79,6 @@ public class WebScreenshotUtils {
 
             // 7. 删除原始图片
             FileUtil.del(imageSavePath);
-            success = true;
 
             return compressedImagePath;
 
@@ -95,19 +94,6 @@ public class WebScreenshotUtils {
                     log.warn("关闭 WebDriver 时出错", ex);
                 }
             }
-            // 如果截图失败，清理整个临时目录
-            if (rootPath != null) {
-                try {
-                    FileUtil.del(rootPath);
-                    if (success) {
-                        log.info("截图成功，已清理临时目录: {}", rootPath);
-                    } else {
-                        log.info("截图失败，已清理临时目录: {}", rootPath);
-                    }
-                } catch (Exception ex) {
-                    log.warn("清理临时目录失败: {}", rootPath, ex);
-                }
-            }
         }
     }
 
@@ -120,14 +106,15 @@ public class WebScreenshotUtils {
      */
     private static WebDriver getWebDriver() {
         try {
-            // 检查 ChromeDriver 文件是否存在
+//            本地用
+/*            // 检查 ChromeDriver 文件是否存在
             File driverFile = new File(CHROME_DRIVER_PATH);
             if (!driverFile.exists()) {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR,
                         "ChromeDriver 未找到，请确保文件存在于: " + CHROME_DRIVER_PATH);
             }
             // 设置本地 ChromeDriver 路径
-            System.setProperty("webdriver.chrome.driver", CHROME_DRIVER_PATH);
+            System.setProperty("webdriver.chrome.driver", CHROME_DRIVER_PATH);*/
             // 配置 Chrome 选项及相关配置
             ChromeOptions options = new ChromeOptions();
             options.addArguments("--headless");  // 无头模式：后台运行不弹出窗口
