@@ -2,6 +2,7 @@ package com.ye.yeaicodemother.ai;
 
 import com.ye.yeaicodemother.model.enums.CodeGenTypeEnum;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.UserMessage;
 
 /**
  * AI代码生成类型智能路由服务
@@ -17,4 +18,13 @@ public interface AiCodeGenTypeRoutingService {
      */
     @SystemMessage(fromResource = "prompt/codegen-routing-system-prompt.txt")
     CodeGenTypeEnum routeCodeGenType(String userPrompt);
+
+    /**
+     * 根据用户提供的应用功能描述生成应用名称
+     *
+     * @param userPrompt 应用的功能 / 使用场景描述
+     * @return 生成的应用名称（不包含多余说明或标点）
+     */
+    @SystemMessage(fromResource = "prompt/app-naming-system-prompt.txt")
+    String generateAppName(String userPrompt);
 }

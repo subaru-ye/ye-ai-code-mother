@@ -248,8 +248,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         BeanUtil.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
 
-        // 自动生成应用名：暂时为 initPrompt 前 12 位
-        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
+        // 使用 AI 生成应用名称，失败时回退到基于 initPrompt 的截取逻辑
+        String appName = null;
+        try {
+            appName = aiCodeGenTypeRoutingService.generateAppName(initPrompt);
+        } catch (Exception e) {
+            log.error("AI 生成应用名称失败，使用降级策略，原因：{}", e.getMessage());
+        }
+        if (StrUtil.isBlank(appName)) {
+            appName = initPrompt.substring(0, Math.min(initPrompt.length(), 12));
+        }
+        app.setAppName(appName);
 
         // 使用 AI 智能选择代码生成类型
         CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
