@@ -61,6 +61,9 @@ public class AiCodeGeneratorServiceFactory {
     @Resource
     private ToolManager toolManager;
 
+    @Resource
+    private PromptSafetyInputGuardrail promptSafetyInputGuardrail;
+
     /**
      * AI 服务实例缓存
      * 缓存策略：
@@ -135,14 +138,16 @@ public class AiCodeGeneratorServiceFactory {
                             ToolExecutionResultMessage.from(toolExecutionRequest,
                                     "Error: there is no tool called " + toolExecutionRequest.name())
                     )
-                    .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
+                    .inputGuardrails(promptSafetyInputGuardrail) // 添加输入护轨
+                    .maxSequentialToolsInvocations(20)
                     .build();
             // HTML 和多文件生成使用默认模型
             case HTML, MULTI_FILE -> AiServices.builder(AiCodeGeneratorService.class)
                     .chatModel(chatModel)
                     .streamingChatModel(openAiStreamingChatModel)
                     .chatMemory(chatMemory)
-                    .inputGuardrails(new PromptSafetyInputGuardrail()) // 添加输入护轨
+                    .inputGuardrails(promptSafetyInputGuardrail) // 添加输入护轨
+                    .maxSequentialToolsInvocations(20)
                     .build();
         };
     }

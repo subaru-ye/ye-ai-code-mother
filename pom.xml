@@ -181,6 +181,12 @@
             <version>3.50.0</version>
         </dependency>
 
+        <!-- Nacos动态服务配置 -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+            <version>2025.0.0.0</version>
+        </dependency>
 
     </dependencies>
 
